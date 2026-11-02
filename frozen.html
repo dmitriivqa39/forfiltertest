@@ -1,14 +1,15 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="overlayopen">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AdGuard assistant + pointer-events demo</title>
+<title>AdGuard issue #3658 — pointer-events demo</title>
 <style>
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
 
   html, body { margin: 0; min-height: 100%; }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     background: #f3efe8;
@@ -16,15 +17,18 @@
   }
 
   /* ============================================================
-     Relevant part of the site's CSS.
-     While the cookie modal is open, the site adds .overlayopen
-     to <html> and disables pointer events for everything.
+     This is the site-side behavior that causes the issue.
+
+     While the cookie popup is open, the site adds .overlayopen
+     to <html> and disables pointer events for the whole document.
+     The popup itself restores pointer-events:auto.
      ============================================================ */
   html.overlayopen {
     pointer-events: none;
     overflow: hidden;
   }
 
+  html.overlayopen .scrollroot,
   html.overlayopen .epharmacy-root {
     pointer-events: none;
   }
@@ -38,9 +42,10 @@
   }
 
   /* ============================================================
-     Simulated site layout
+     Demo storefront layout
      ============================================================ */
   .epharmacy-root { min-height: 100vh; }
+  .scrollroot { min-height: 100vh; }
 
   .site-header {
     display: flex;
@@ -68,8 +73,21 @@
   .site-main {
     max-width: 1000px;
     margin: 0 auto;
-    padding: 56px 24px 120px;
+    padding: 40px 24px 80px;
   }
+
+  .demo-banner {
+    margin-bottom: 36px;
+    padding: 16px 18px;
+    background: #fff8e8;
+    border: 1px solid #ead9b5;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: #5b4b2a;
+  }
+
+  .demo-banner strong { display: block; margin-bottom: 4px; }
 
   .site-main h1 {
     font-size: clamp(28px, 4vw, 44px);
@@ -101,13 +119,27 @@
   .card p { margin: 0; font-size: 13px; color: #5b665f; }
   .card .price { display: inline-block; margin-top: 12px; font-weight: 700; color: #2f6b45; }
 
-  @media (max-width: 720px) {
-    .cards { grid-template-columns: 1fr; }
-    .site-nav { display: none; }
+  .site-footer {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px;
+    border-top: 1px solid #e3ddd3;
+    color: #6b756f;
+    font-size: 13px;
+  }
+
+  .cookie-settings {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #2f6b45;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
   }
 
   /* ============================================================
-     Cookie modal (site's own overlay)
+     Cookie popup
      ============================================================ */
   .bp5-overlay-open {
     position: fixed;
@@ -127,7 +159,7 @@
 
   .bp5-overlay-content {
     position: relative;
-    width: min(540px, 100%);
+    width: min(560px, 100%);
     background: #fff;
     border-radius: 16px;
     padding: 26px;
@@ -143,7 +175,26 @@
     line-height: 1.55;
   }
 
-  .cookie-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .cookie-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: #eef3f0;
+    color: #40534a;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .cookie-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
 
   .btn {
     border: 0;
@@ -159,549 +210,161 @@
   .btn.primary { background: #2f6b45; color: #fff; }
   .btn.secondary { background: #eef3f0; color: #26352d; }
 
-  .gdpr-popup.selected {
-    outline: 4px solid #ff5a5a;
-    outline-offset: 6px;
+  .demo-hint {
+    margin: 18px 0 0 !important;
+    padding: 10px 12px;
+    background: #f3f6f4;
+    border: 1px dashed #b9cbbf;
+    border-radius: 8px;
+    color: #40534a !important;
+    font-size: 12px !important;
   }
 
-  .gdpr-popup.selected::after {
-    content: "selected element";
-    position: absolute;
-    top: -34px;
-    left: 0;
-    background: #ff5a5a;
-    color: #fff;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-weight: 700;
-    font-size: 11px;
-    line-height: 1;
-    padding: 7px 9px;
-    border-radius: 6px;
-  }
-
-  /* ============================================================
-     Assistant's preventEvents overlay
-     z-index is one below the assistant iframe.
-     ============================================================ */
-  #ag-prevent-events {
-    position: fixed;
-    inset: 0;
-    z-index: 2147483646;
-    pointer-events: all;
-    background: transparent;
-  }
-
-  /* ============================================================
-     Test harness — intentionally above everything and clickable,
-     so the demo can be reset even when the page is "frozen".
-     ============================================================ */
-  #test-controls {
-    position: fixed;
-    left: 16px;
-    bottom: 16px;
-    z-index: 2147483647;
-    width: min(390px, calc(100vw - 32px));
-    max-height: calc(100vh - 32px);
-    overflow: auto;
-    pointer-events: auto;
-    background: #111814;
-    color: #e8f0eb;
-    border: 1px solid #2b3a31;
-    border-radius: 12px;
-    padding: 14px;
-    box-shadow: 0 18px 50px rgba(0, 0, 0, .45);
+  kbd {
+    padding: 1px 5px;
+    border: 1px solid #c9d5cd;
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: #fff;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 11px;
-    line-height: 1.45;
   }
 
-  .tc-title {
-    font-weight: 700;
-    letter-spacing: .08em;
-    font-size: 11px;
-    color: #9fd3ae;
+  @media (max-width: 720px) {
+    .cards { grid-template-columns: 1fr; }
+    .site-nav { display: none; }
   }
-
-  .tc-title span {
-    color: #6f8277;
-    font-weight: 400;
-    letter-spacing: 0;
-  }
-
-  .tc-desc { margin: 8px 0; color: #a9b8af; }
-  .tc-desc code, .tc-check code { color: #c8e6d2; }
-
-  .tc-list {
-    margin: 8px 0 10px 18px;
-    padding: 0;
-    color: #a9b8af;
-  }
-
-  .tc-list li { margin: 3px 0; }
-
-  .tc-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: 10px 0;
-  }
-
-  .tc-actions button {
-    flex: 1 1 auto;
-    background: #24352b;
-    color: #e8f0eb;
-    border: 1px solid #385143;
-    border-radius: 7px;
-    padding: 7px 8px;
-    font-family: inherit;
-    font-weight: 600;
-    font-size: 10px;
-    line-height: 1.2;
-    cursor: pointer;
-  }
-
-  .tc-actions button:hover { background: #2d4437; }
-
-  .tc-check {
-    display: flex;
-    gap: 7px;
-    align-items: flex-start;
-    margin: 10px 0;
-    color: #d7e6dc;
-    cursor: pointer;
-  }
-
-  .tc-check input {
-    margin: 2px 0 0;
-    accent-color: #67b279;
-  }
-
-  .tc-state {
-    margin: 8px 0;
-    padding: 8px;
-    background: #0a0f0c;
-    border: 1px solid #24352b;
-    border-radius: 6px;
-    color: #9fd3ae;
-    white-space: pre-wrap;
-    font-size: 10px;
-  }
-
-  .tc-log {
-    border-top: 1px solid #24352b;
-    padding-top: 7px;
-    color: #91a398;
-    font-size: 10px;
-  }
-
-  .tc-log div { margin: 2px 0; }
 </style>
 </head>
 <body>
 
   <div class="epharmacy-root">
-    <header class="site-header">
-      <div class="brand">APOTHEKA <span>BEAUTY</span></div>
-      <nav class="site-nav">
-        <span>Shop</span>
-        <span>Brands</span>
-        <span>Account</span>
-      </nav>
-    </header>
+    <div class="scrollroot">
 
-    <main class="site-main">
-      <h1>Demo storefront</h1>
-      <p>
-        This page imitates the relevant behavior of
-        <code>apothekabeauty.ee</code>: while the cookie popup is open,
-        the site sets <code>pointer-events: none</code> on <code>&lt;html&gt;</code>.
-      </p>
+      <header class="site-header">
+        <div class="brand">APOTHEKA <span>BEAUTY</span></div>
+        <nav class="site-nav">
+          <span>Shop</span>
+          <span>Brands</span>
+          <span>Account</span>
+        </nav>
+      </header>
 
-      <div class="cards">
-        <article class="card">
-          <h3>Demo product one</h3>
-          <p>Placeholder content for the page behind the modal.</p>
-          <span class="price">€19.90</span>
-        </article>
-        <article class="card">
-          <h3>Demo product two</h3>
-          <p>Placeholder content for the page behind the modal.</p>
-          <span class="price">€24.50</span>
-        </article>
-        <article class="card">
-          <h3>Demo product three</h3>
-          <p>Placeholder content for the page behind the modal.</p>
-          <span class="price">€12.00</span>
-        </article>
-      </div>
-    </main>
+      <main class="site-main">
+        <div class="demo-banner">
+          <strong>Demo for AdGuard issue #3658</strong>
+          Use the real AdGuard extension: “Block ads manually” → select the cookie
+          popup. Press <kbd>F5</kbd> to reload or <kbd>ESC</kbd> to close the popup.
+        </div>
+
+        <h1>Demo storefront</h1>
+        <p>
+          This page reproduces the relevant behavior of
+          <code>apothekabeauty.ee</code>: while the cookie popup is open, the
+          site sets <code>pointer-events: none</code> on <code>&lt;html&gt;</code>.
+        </p>
+
+        <div class="cards">
+          <article class="card">
+            <h3>Demo product one</h3>
+            <p>Placeholder content for the page behind the modal.</p>
+            <span class="price">€19.90</span>
+          </article>
+          <article class="card">
+            <h3>Demo product two</h3>
+            <p>Placeholder content for the page behind the modal.</p>
+            <span class="price">€24.50</span>
+          </article>
+          <article class="card">
+            <h3>Demo product three</h3>
+            <p>Placeholder content for the page behind the modal.</p>
+            <span class="price">€12.00</span>
+          </article>
+        </div>
+
+        <div style="height: 420px"></div>
+
+        <p>
+          Extra content so the page is tall enough to notice the scroll lock
+          caused by <code>overflow: hidden</code> on <code>&lt;html&gt;</code>.
+        </p>
+      </main>
+
+      <footer class="site-footer">
+        Demo page. Cookie settings:
+        <button id="cookie-settings" class="cookie-settings" type="button">
+          open cookie popup
+        </button>
+      </footer>
+
+    </div>
   </div>
 
-  <!-- Site's cookie modal. It restores pointer-events:auto on itself. -->
-  <div id="cookie-modal" class="bp5-overlay-open" hidden>
+  <!--
+    Cookie popup. It is a sibling of .epharmacy-root, like a React portal
+    on the real site. This is important: it restores pointer-events:auto
+    and remains clickable while the rest of the page does not.
+  -->
+  <div id="cookie-modal" class="bp5-overlay-open" role="dialog" aria-modal="true" aria-labelledby="cookie-title">
     <div class="bp5-overlay-backdrop"></div>
-    <div class="bp5-overlay-content gdpr-popup" role="dialog" aria-modal="true" aria-labelledby="cookie-title">
+
+    <div class="bp5-overlay-content gdpr-popup">
+      <button id="close-cookie" class="cookie-close" type="button" aria-label="Close">×</button>
+
       <h2 id="cookie-title">Info about cookies</h2>
+
       <p>
         We use cookies to personalise content and ads, to provide social media
         features and to analyse our traffic. This is a simplified demo popup.
       </p>
+
       <div class="cookie-actions">
-        <button id="accept-all" class="btn primary" type="button">Accept all cookies</button>
-        <button id="accept-selected" class="btn secondary" type="button">Accept selected cookies</button>
+        <button id="accept-all" class="btn primary" type="button">
+          Accept all cookies
+        </button>
+        <button id="accept-selected" class="btn secondary" type="button">
+          Accept selected cookies
+        </button>
       </div>
+
+      <p class="demo-hint">
+        <strong>Test with the real extension:</strong>
+        click “Block ads manually”, then select this popup. The assistant menu
+        should become visible but unclickable. Press <kbd>ESC</kbd> to close
+        this popup and restore pointer events.
+      </p>
     </div>
   </div>
-
-  <!-- Test harness, not part of the simulated site. -->
-  <aside id="test-controls">
-    <div class="tc-title">TEST HARNESS <span>not part of the page</span></div>
-
-    <p class="tc-desc">
-      The assistant is a real iframe inside a closed shadow root appended to
-      <code>&lt;html&gt;</code>. The site sets <code>pointer-events:none</code>
-      on <code>&lt;html&gt;</code>, so the iframe inherits it and cannot be clicked.
-    </p>
-
-    <ol class="tc-list">
-      <li>Try clicking the assistant buttons — nothing happens.</li>
-      <li>Check “Apply fix” — the assistant becomes clickable.</li>
-      <li>Press ESC — the page unfreezes.</li>
-    </ol>
-
-    <div class="tc-actions">
-      <button id="btn-replay" type="button">Replay frozen state</button>
-      <button id="btn-reset" type="button">Reset to normal</button>
-      <button id="btn-esc" type="button">Press ESC</button>
-    </div>
-
-    <label class="tc-check">
-      <input type="checkbox" id="chk-fix">
-      <span>Apply fix: <code>pointer-events:auto</code> on assistant host/iframe</span>
-    </label>
-
-    <pre id="state" class="tc-state"></pre>
-    <div id="log" class="tc-log"></div>
-  </aside>
 
   <script>
     const html = document.documentElement;
     const modal = document.getElementById('cookie-modal');
-    const stateEl = document.getElementById('state');
-    const logEl = document.getElementById('log');
-    const chkFix = document.getElementById('chk-fix');
 
-    let assistantHost = null;
-    let assistantIframe = null;
-
-    function log(message) {
-      const line = document.createElement('div');
-      const time = new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-      line.textContent = '[' + time + '] ' + message;
-      logEl.prepend(line);
-
-      while (logEl.childElementCount > 6) {
-        logEl.lastElementChild.remove();
-      }
-    }
-
-    function updateState() {
-      const overlayOpen = html.classList.contains('overlayopen');
-      const prevent = Boolean(document.getElementById('ag-prevent-events'));
-      const hostPE = assistantHost
-        ? getComputedStyle(assistantHost).pointerEvents
-        : 'n/a';
-      const framePE = assistantIframe
-        ? getComputedStyle(assistantIframe).pointerEvents
-        : 'n/a';
-
-      stateEl.textContent =
-        'html.overlayopen: ' + overlayOpen + '\n' +
-        'preventEvents overlay: ' + prevent + '\n' +
-        'assistant host pointer-events: ' + hostPE + '\n' +
-        'assistant iframe pointer-events: ' + framePE;
-    }
-
-    function createAssistant() {
-      if (assistantHost) return;
-
-      assistantHost = document.createElement('div');
-      assistantHost.id = 'adguard-assistant-host';
-
-      const shadow = assistantHost.attachShadow({ mode: 'closed' });
-
-      const style = document.createElement('style');
-      style.textContent = `
-        :host {
-          display: block !important;
-          position: relative !important;
-          width: 0 !important;
-          height: 0 !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          z-index: 2147483647 !important;
-        }
-
-        /* This is the proposed fix: re-enable pointer events explicitly. */
-        :host(.fixed) {
-          pointer-events: auto !important;
-        }
-
-        iframe#adguard-assistant-dialog {
-          position: fixed;
-          top: 24px;
-          right: 24px;
-          width: 320px;
-          height: 236px;
-          border: 0;
-          border-radius: 10px;
-          box-shadow: 0 18px 50px rgba(0, 0, 0, .35);
-          z-index: 2147483647;
-          display: block !important;
-          background: #fff;
-        }
-
-        :host(.fixed) iframe#adguard-assistant-dialog {
-          pointer-events: auto !important;
-        }
-      `;
-
-      assistantIframe = document.createElement('iframe');
-      assistantIframe.id = 'adguard-assistant-dialog';
-      assistantIframe.title = 'AdGuard Assistant';
-      assistantIframe.setAttribute('frameborder', '0');
-
-      assistantIframe.srcdoc = `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  html, body { margin: 0; height: 100%; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    font-size: 13px;
-    line-height: 1.4;
-    color: #1f2933;
-    background: #fff;
-  }
-  .head {
-    background: #67b279;
-    color: #fff;
-    padding: 10px 12px;
-    font-weight: 700;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .head span {
-    font-weight: 400;
-    font-size: 10px;
-    opacity: .9;
-  }
-  .body { padding: 12px; }
-  .path {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 10px;
-    line-height: 1.4;
-    background: #f3f6f4;
-    border: 1px solid #dde5df;
-    border-radius: 6px;
-    padding: 7px;
-    word-break: break-all;
-    color: #40534a;
-    margin-bottom: 8px;
-  }
-  button {
-    width: 100%;
-    border: 0;
-    border-radius: 7px;
-    padding: 8px 10px;
-    margin-top: 7px;
-    font-family: inherit;
-    font-weight: 600;
-    font-size: 12px;
-    line-height: 1;
-    cursor: pointer;
-  }
-  .primary { background: #67b279; color: #fff; }
-  .secondary { background: #eef3f0; color: #26352d; }
-  .ghost { background: transparent; color: #6b7a72; border: 1px solid #d7e0da; }
-  .hint {
-    font-size: 9px;
-    color: #8a988f;
-    margin-top: 8px;
-    text-align: center;
-  }
-</style>
-</head>
-<body>
-  <div class="head">AdGuard Assistant <span>manual blocking</span></div>
-  <div class="body">
-    <div class="path">apothekabeauty.ee##.gdpr-consent-popup</div>
-    <button class="primary" data-action="block">Block element</button>
-    <button class="secondary" data-action="preview">Preview</button>
-    <button class="ghost" data-action="cancel">Cancel</button>
-    <div class="hint">Simulated assistant iframe</div>
-  </div>
-  <script>
-    document.querySelectorAll('button[data-action]').forEach(function (button) {
-      button.addEventListener('click', function () {
-        parent.postMessage({
-          type: 'assistant-click',
-          action: button.dataset.action
-        }, '*');
-      });
-    });
-
-    document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape') {
-        parent.postMessage({ type: 'assistant-escape' }, '*');
-      }
-    });
-  <\/script>
-</body>
-</html>`;
-
-      shadow.append(style, assistantIframe);
-      document.documentElement.appendChild(assistantHost);
-    }
-
-    function addPreventOverlay() {
-      if (document.getElementById('ag-prevent-events')) return;
-
-      const overlay = document.createElement('div');
-      overlay.id = 'ag-prevent-events';
-      document.body.appendChild(overlay);
-      log('preventEvents overlay added: z-index 2147483646, pointer-events:all.');
-      updateState();
-    }
-
-    function removePreventOverlay() {
-      const overlay = document.getElementById('ag-prevent-events');
-      if (overlay) overlay.remove();
-      updateState();
-    }
-
-    function openCookiePopup() {
-      removePreventOverlay();
-      modal.hidden = false;
-      modal.classList.remove('selected');
-      html.classList.add('overlayopen');
-      log('Cookie popup opened: <html> gets .overlayopen -> pointer-events:none.');
-      updateState();
-    }
-
-    function closeCookiePopup(reason) {
-      html.classList.remove('overlayopen');
-      modal.hidden = true;
-      modal.classList.remove('selected');
-      removePreventOverlay();
-      log('Cookie popup closed (' + reason + '). pointer-events restored on <html>.');
-      updateState();
-    }
-
-    function replayFrozen() {
-      if (!assistantHost) createAssistant();
-
-      chkFix.checked = false;
-      assistantHost.classList.remove('fixed');
-
+    function openCookieConsent() {
       html.classList.add('overlayopen');
       modal.hidden = false;
-      modal.classList.add('selected');
-      addPreventOverlay();
-
-      log('Replayed frozen state: cookie popup selected, assistant visible but unclickable.');
-      updateState();
     }
 
-    function resetToNormal() {
+    function closeCookieConsent() {
       html.classList.remove('overlayopen');
       modal.hidden = true;
-      modal.classList.remove('selected');
-      removePreventOverlay();
-
-      chkFix.checked = false;
-      if (!assistantHost) createAssistant();
-      assistantHost.classList.remove('fixed');
-
-      log('Reset: normal page, cookie popup closed, assistant should be clickable.');
-      updateState();
     }
 
-    document.getElementById('btn-replay').addEventListener('click', replayFrozen);
-    document.getElementById('btn-reset').addEventListener('click', resetToNormal);
-    document.getElementById('btn-esc').addEventListener('click', function () {
-      closeCookiePopup('ESC button');
-    });
+    document.getElementById('accept-all').addEventListener('click', closeCookieConsent);
+    document.getElementById('accept-selected').addEventListener('click', closeCookieConsent);
+    document.getElementById('close-cookie').addEventListener('click', closeCookieConsent);
+    document.getElementById('cookie-settings').addEventListener('click', openCookieConsent);
 
-    document.getElementById('accept-all').addEventListener('click', function () {
-      closeCookiePopup('Accept all');
-    });
-
-    document.getElementById('accept-selected').addEventListener('click', function () {
-      closeCookiePopup('Accept selected');
-    });
-
-    chkFix.addEventListener('change', function () {
-      if (!assistantHost) createAssistant();
-
-      assistantHost.classList.toggle('fixed', chkFix.checked);
-
-      log(chkFix.checked
-        ? 'Fix applied: pointer-events:auto on assistant host/iframe.'
-        : 'Fix removed: assistant inherits pointer-events again.');
-
-      updateState();
-    });
-
-    window.addEventListener('message', function (event) {
-      const data = event.data;
-      if (!data || typeof data !== 'object') return;
-
-      if (data.type === 'assistant-click') {
-        log('Assistant button clicked: ' + data.action);
-      }
-
-      if (data.type === 'assistant-escape' && !modal.hidden) {
-        closeCookiePopup('ESC from assistant iframe');
-      }
-    });
-
-    document.addEventListener('click', function (event) {
-      if (event.target.closest('#test-controls')) return;
-      if (event.target.closest('#adguard-assistant-host')) return;
-
-      log('Page click received on <' + event.target.tagName.toLowerCase() + '>.');
-    }, true);
-
+    /*
+      Mimics the site's modal behavior. This is why ESC recovers the page:
+      keyboard events are not affected by pointer-events.
+    */
     document.addEventListener('keydown', function (event) {
-      if (event.key !== 'Escape') return;
-
-      if (!modal.hidden) {
-        closeCookiePopup('ESC key');
-      } else if (assistantHost) {
-        assistantHost.remove();
-        assistantHost = null;
-        assistantIframe = null;
-        chkFix.checked = false;
-        log('Assistant closed with ESC.');
-        updateState();
+      if (event.key === 'Escape' && !modal.hidden) {
+        closeCookieConsent();
       }
     });
-
-    /* Initial state: reproduce the issue immediately. */
-    createAssistant();
-    html.classList.add('overlayopen');
-    modal.hidden = false;
-    modal.classList.add('selected');
-    addPreventOverlay();
-    log('Initial state: cookie popup is open and selected. The assistant is visible but unclickable.');
-    updateState();
   </script>
+
 </body>
 </html>
