@@ -5,469 +5,192 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <link rel="icon" href="data:,">
-<title>Request probe — first- and third-party</title>
+<title>Filtering log test page</title>
 <style>
   :root {
     color-scheme: light dark;
-    --bg: #0d1117;
-    --panel: #151b24;
-    --panel-2: #1a2230;
-    --line: #26303f;
-    --text: #e8edf6;
-    --muted: #94a1b5;
-    --accent: #79a8ff;
-    --ok: #5fd3a2;
-    --bad: #ff8f8f;
-    --radius: 14px;
-    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --line: #dfe3ea;
+    --text: #1b2330;
+    --muted: #5f6b7c;
+    --ok: #157f45;
+    --bad: #b3261e;
   }
 
-  @media (prefers-color-scheme: light) {
+  @media (prefers-color-scheme: dark) {
     :root {
-      color-scheme: light;
-      --bg: #f3f5f9;
-      --panel: #ffffff;
-      --panel-2: #f6f8fb;
-      --line: #dbe2ec;
-      --text: #151b26;
-      --muted: #5b6779;
-      --accent: #1f5fd1;
-      --ok: #0c7a4d;
-      --bad: #b42318;
+      color-scheme: dark;
+      --bg: #12161c;
+      --panel: #1a2029;
+      --line: #2a323d;
+      --text: #e6ebf2;
+      --muted: #97a3b4;
+      --ok: #4fbf82;
+      --bad: #f08a80;
     }
   }
 
-  *,
-  *::before,
-  *::after { box-sizing: border-box; }
-
-  html { -webkit-text-size-adjust: 100%; }
+  * { box-sizing: border-box; }
 
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    font-size: 16px;
-    line-height: 1.55;
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   }
 
-  .page {
-    width: min(1020px, 100%);
+  main {
+    max-width: 760px;
     margin: 0 auto;
-    padding: 40px 20px 56px;
-  }
-
-  .eyebrow {
-    margin: 0 0 8px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    color: var(--accent);
+    padding: 40px 20px 60px;
   }
 
   h1 {
-    margin: 0;
-    font-size: clamp(26px, 4vw, 38px);
-    line-height: 1.15;
-    letter-spacing: -.02em;
-  }
-
-  .lede {
-    margin: 12px 0 0;
-    max-width: 72ch;
-    color: var(--muted);
-  }
-
-  .lede strong { color: var(--text); }
-
-  .meta {
-    margin: 14px 0 0;
-    font-size: 13px;
-    color: var(--muted);
-  }
-
-  code {
-    font-family: var(--mono);
-    font-size: .92em;
-    background: var(--panel-2);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 1px 6px;
-    word-break: break-all;
-  }
-
-  .ab-probe-cosmetic-7f3c9a2e {
-    margin: 24px 0 0;
-    padding: 14px 16px;
-    border: 1px dashed var(--accent);
-    border-radius: 12px;
-    background: var(--panel-2);
-    font-size: 14px;
-    color: var(--muted);
-  }
-
-  .ab-probe-cosmetic-7f3c9a2e strong { color: var(--accent); }
-  .ab-probe-cosmetic-7f3c9a2e code { color: var(--text); }
-
-  .grid {
-    display: grid;
-    gap: 18px;
-    margin-top: 22px;
-  }
-
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 18px;
-  }
-
-  .card-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 6px 16px;
-    margin-bottom: 10px;
-  }
-
-  h2 {
-    margin: 0;
-    font-size: 18px;
+    margin: 0 0 8px;
+    font-size: 28px;
     letter-spacing: -.01em;
   }
 
-  h2 .tag { margin-left: 8px; }
+  p { margin: 0 0 14px; }
 
-  .summary {
-    margin: 0;
-    font-size: 13px;
+  .lede { color: var(--muted); }
+
+  .promo-banner {
+    margin: 22px 0;
+    padding: 14px 16px;
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    background: var(--panel);
     color: var(--muted);
-    font-variant-numeric: tabular-nums;
+    font-size: 14px;
   }
-
-  .summary.has-fail { color: var(--bad); }
-
-  .table-wrap { overflow-x: auto; }
 
   table {
     width: 100%;
+    margin-top: 18px;
     border-collapse: collapse;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
     font-size: 14px;
   }
 
-  th,
-  td {
-    padding: 10px 12px;
+  th, td {
+    padding: 9px 12px;
     text-align: left;
-    vertical-align: top;
     border-bottom: 1px solid var(--line);
   }
 
+  tr:last-child td { border-bottom: 0; }
+
   th {
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: .07em;
+    font-size: 12px;
     text-transform: uppercase;
+    letter-spacing: .05em;
     color: var(--muted);
-    white-space: nowrap;
-  }
-
-  tbody tr:last-child td { border-bottom: 0; }
-
-  th.num,
-  td.num {
-    width: 40px;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
   }
 
   td.url {
-    font-family: var(--mono);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 12.5px;
-    line-height: 1.45;
     word-break: break-all;
   }
 
-  .tag {
-    display: inline-block;
-    padding: 2px 8px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: .05em;
-    text-transform: uppercase;
-    color: var(--muted);
-    white-space: nowrap;
-  }
-
-  .pill {
-    display: inline-block;
-    padding: 3px 10px;
-    border: 1px solid currentColor;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .pill.pending { color: var(--muted); }
-  .pill.ok { color: var(--ok); }
-  .pill.bad { color: var(--bad); }
-
-  .ms {
-    margin-left: 7px;
-    font-size: 12px;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  .notes {
-    margin: 0;
-    padding-left: 20px;
-    color: var(--muted);
-    font-size: 14px;
-  }
-
-  .notes li + li { margin-top: 8px; }
-  .notes strong { color: var(--text); }
-
-  footer {
-    margin-top: 26px;
-    font-size: 12.5px;
-    color: var(--muted);
-  }
-
-  footer p { margin: 0; }
-
-  @media (max-width: 760px) {
-    .page { padding: 28px 14px 44px; }
-    .card { padding: 14px; }
-    th.purpose,
-    td.purpose { display: none; }
-  }
+  td.result { white-space: nowrap; }
+  td.result.sent { color: var(--ok); }
+  td.result.failed { color: var(--bad); }
+  td.result.pending { color: var(--muted); }
 </style>
 </head>
 <body>
-<main class="page">
-  <header class="hero">
-    <p class="eyebrow">Single-file network probe</p>
-    <h1>First- and third-party request probe</h1>
-    <p class="lede">
-      Nine requests fire automatically when this page loads: four to this page’s own host
-      and five to other hosts. Nothing needs a click, and nothing waits for scroll.
-      A request that a filter blocks never completes and is reported as
-      <strong>no response</strong>.
-    </p>
-    <p class="meta">Page URL: <code id="page-url">resolving…</code></p>
-  </header>
+<main>
+  <h1>Filtering log test page</h1>
+  <p class="lede">
+    This page sends six requests to its own host and four requests to other hosts.
+    Everything starts on load, once per reload.
+  </p>
 
-  <aside class="ab-probe-cosmetic-7f3c9a2e" aria-label="Cosmetic filter target">
-    <strong>Cosmetic-filter target.</strong>
-    This element is the only one on the page carrying the class
-    <code>ab-probe-cosmetic-7f3c9a2e</code>. A cosmetic rule hides it; the probe
-    table keeps working either way.
-  </aside>
-
-  <div class="grid">
-    <section class="card" aria-labelledby="first-heading">
-      <div class="card-head">
-        <h2 id="first-heading">First-party <span class="tag">same host as the page</span></h2>
-        <p class="summary" id="first-summary">starting…</p>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th class="num" scope="col">#</th>
-              <th scope="col">Request URL</th>
-              <th scope="col">Type</th>
-              <th class="purpose" scope="col">Purpose</th>
-              <th scope="col">Result</th>
-            </tr>
-          </thead>
-          <tbody id="first-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="card" aria-labelledby="third-heading">
-      <div class="card-head">
-        <h2 id="third-heading">Third-party <span class="tag">other hosts</span></h2>
-        <p class="summary" id="third-summary">starting…</p>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th class="num" scope="col">#</th>
-              <th scope="col">Request URL</th>
-              <th scope="col">Type</th>
-              <th class="purpose" scope="col">Purpose</th>
-              <th scope="col">Result</th>
-            </tr>
-          </thead>
-          <tbody id="third-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="card" aria-labelledby="notes-heading">
-      <h2 id="notes-heading">How to read the results</h2>
-      <ul class="notes">
-        <li>Every probe is a <code>fetch()</code>, which browser devtools list as XHR. All probes start during page load, concurrently.</li>
-        <li>Same-origin probes resolve against the page URL and point at files that need not exist. An HTTP 404 still proves the request was made and was not blocked.</li>
-        <li>Cross-origin probes use <code>mode: "no-cors"</code>, so a completed request reports an opaque response.</li>
-        <li><code>cache: "no-store"</code> keeps every reload identical: the same URLs hit the network again instead of coming from cache.</li>
-      </ul>
-    </section>
+  <div class="promo-banner">
+    Promo banner. A cosmetic rule can hide this element; nothing else on the page uses this class.
   </div>
 
-  <footer>
-    <p>Single HTML file · no external assets or libraries · works at any https URL</p>
-  </footer>
+  <table>
+    <thead>
+      <tr>
+        <th>Request</th>
+        <th>Party</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody id="probes"></tbody>
+  </table>
 </main>
 
 <script>
 (() => {
   'use strict';
 
-  const TOKEN = '7f3c9a2e';
-  const DIR = 'adblock-probe-' + TOKEN + '/';
-
   const probes = [
-    { n: 1, party: 'first', type: 'XHR', path: DIR + 'blocked-endpoint.json', purpose: 'Blocking-rule target', mode: 'same-origin' },
-    { n: 2, party: 'first', type: 'XHR', path: DIR + 'allowed-endpoint.txt', purpose: 'Allowing-rule target', mode: 'same-origin' },
-    { n: 3, party: 'first', type: 'XHR', path: DIR + 'first-party-a.json', purpose: 'Plain first-party probe', mode: 'same-origin' },
-    { n: 4, party: 'first', type: 'XHR', path: DIR + 'first-party-b.txt', purpose: 'Plain first-party probe', mode: 'same-origin' },
-    { n: 5, party: 'third', type: 'XHR', url: 'https://cloudflare.com/cdn-cgi/trace', purpose: 'Cloudflare trace', mode: 'no-cors' },
-    { n: 6, party: 'third', type: 'XHR', url: 'https://www.google.com/generate_204', purpose: 'Google connectivity check', mode: 'no-cors' },
-    { n: 7, party: 'third', type: 'XHR', url: 'https://connectivitycheck.gstatic.com/generate_204', purpose: 'Android connectivity check', mode: 'no-cors' },
-    { n: 8, party: 'third', type: 'XHR', url: 'https://api.github.com/zen', purpose: 'GitHub REST API', mode: 'no-cors' },
-    { n: 9, party: 'third', type: 'XHR', url: 'https://en.wikipedia.org/robots.txt', purpose: 'Wikipedia robots.txt', mode: 'no-cors' }
+    { path: 'ads/banner.png', party: '1P' },
+    { path: 'ads/promo.css', party: '1P' },
+    { path: 'ads/tracker.js', party: '1P' },
+    { path: 'ads/partner.js', party: '1P' },
+    { path: 'data.json', party: '1P' },
+    { path: 'logo.txt', party: '1P' },
+    { url: 'https://www.google.com/generate_204', party: '3P' },
+    { url: 'https://cloudflare.com/cdn-cgi/trace', party: '3P' },
+    { url: 'https://api.github.com/zen', party: '3P' },
+    { url: 'https://en.wikipedia.org/robots.txt', party: '3P' }
   ];
 
-  const firstBody = document.getElementById('first-body');
-  const thirdBody = document.getElementById('third-body');
-  const cells = new Map();
-
-  const totals = {
-    first: { total: 0, sent: 0, failed: 0 },
-    third: { total: 0, sent: 0, failed: 0 }
-  };
+  const tbody = document.getElementById('probes');
 
   function urlOf(probe) {
     return probe.url || new URL(probe.path, document.baseURI).href;
   }
 
   function addRow(probe) {
-    const tbody = probe.party === 'first' ? firstBody : thirdBody;
     const tr = document.createElement('tr');
-
-    const num = document.createElement('td');
-    num.className = 'num';
-    num.textContent = String(probe.n);
 
     const url = document.createElement('td');
     url.className = 'url';
     url.textContent = urlOf(probe);
 
-    const type = document.createElement('td');
-    const typeTag = document.createElement('span');
-    typeTag.className = 'tag';
-    typeTag.textContent = probe.type;
-    type.appendChild(typeTag);
-
-    const purpose = document.createElement('td');
-    purpose.className = 'purpose';
-    purpose.textContent = probe.purpose;
+    const party = document.createElement('td');
+    party.textContent = probe.party;
 
     const result = document.createElement('td');
-    result.className = 'result';
-    const pending = document.createElement('span');
-    pending.className = 'pill pending';
-    pending.textContent = 'pending…';
-    result.appendChild(pending);
+    result.className = 'result pending';
+    result.textContent = 'pending';
 
-    tr.append(num, url, type, purpose, result);
+    tr.append(url, party, result);
     tbody.appendChild(tr);
 
-    cells.set(probe.n, result);
-    totals[probe.party].total += 1;
+    return result;
   }
 
-  function renderSummary(party, t) {
-    const el = document.getElementById(party + '-summary');
-    const done = t.sent + t.failed;
-    let text;
-
-    if (done < t.total) {
-      text = done + ' of ' + t.total + ' finished';
-    } else if (t.failed === 0) {
-      text = t.sent + ' of ' + t.total + ' requests sent';
-    } else {
-      text = t.sent + ' of ' + t.total + ' requests sent · ' + t.failed + ' without response';
-    }
-
-    el.textContent = text;
-    el.classList.toggle('has-fail', t.failed > 0);
-  }
-
-  async function fire(probe) {
-    let outcome;
-    const started = performance.now();
-
+  async function fire(probe, cell) {
     try {
       const response = await fetch(urlOf(probe), {
-        mode: probe.mode,
+        mode: probe.url ? 'no-cors' : 'same-origin',
         credentials: 'omit',
         cache: 'no-store',
-        redirect: 'follow',
         referrerPolicy: 'no-referrer'
       });
 
-      outcome = {
-        sent: true,
-        label: response.type === 'opaque' ? 'sent (opaque)' : 'sent · HTTP ' + response.status
-      };
+      cell.className = 'result sent';
+      cell.textContent = response.type === 'opaque' ? 'sent' : 'HTTP ' + response.status;
     } catch (error) {
-      outcome = { sent: false, label: 'no response' };
+      cell.className = 'result failed';
+      cell.textContent = 'no response';
     }
-
-    const ms = Math.round(performance.now() - started);
-    const cell = cells.get(probe.n);
-
-    cell.textContent = '';
-
-    const pill = document.createElement('span');
-    pill.className = 'pill ' + (outcome.sent ? 'ok' : 'bad');
-    pill.textContent = outcome.label;
-
-    const timing = document.createElement('span');
-    timing.className = 'ms';
-    timing.textContent = ms + ' ms';
-
-    cell.append(pill, timing);
-
-    const t = totals[probe.party];
-    if (outcome.sent) {
-      t.sent += 1;
-    } else {
-      t.failed += 1;
-    }
-    renderSummary(probe.party, t);
   }
 
-  document.getElementById('page-url').textContent = location.href;
-
-  probes.forEach(addRow);
-  renderSummary('first', totals.first);
-  renderSummary('third', totals.third);
-  probes.forEach((probe) => { fire(probe); });
+  probes.forEach((probe) => {
+    fire(probe, addRow(probe));
+  });
 })();
 </script>
 </body>
