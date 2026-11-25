@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AdGuard Extra Injection Check</title>
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --border: #e3e8ef;
+    --text: #1c2430;
+    --muted: #5b6673;
+    --accent: #2563eb;
+    --ok-bg: #e6f6ec; --ok-fg: #0f7a3d;
+    --off-bg: #eef1f5; --off-fg: #5b6673;
+    --warn-bg: #fdf3e3; --warn-fg: #a15c07;
+    --err-bg: #fdeaea; --err-fg: #b42318;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px 48px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.5;
+  }
+  .container { max-width: 880px; margin: 0 auto; }
+  header h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  header p { margin: 0 0 20px; color: var(--muted); font-size: 0.95rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 0 0 16px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  }
+  .card h2 { margin: 0 0 4px; font-size: 1.05rem; }
+  .card .sub { margin: 0 0 14px; color: var(--muted); font-size: 0.85rem; }
+  .verdict {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 14px 16px; border-radius: 10px;
+    background: #fbfcfe; border: 1px solid var(--border);
+  }
+  .verdict .title { font-weight: 700; font-size: 1.02rem; }
+  .verdict .hint { color: var(--muted); font-size: 0.85rem; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 0.8rem; font-weight: 600; white-space: nowrap;
+  }
+  .badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .badge.ok  { background: var(--ok-bg);  color: var(--ok-fg); }
+  .badge.off { background: var(--off-bg); color: var(--off-fg); }
+  .badge.warn{ background: var(--warn-bg); color: var(--warn-fg); }
+  .badge.err { background: var(--err-bg); color: var(--err-fg); }
+  button {
+    font: inherit; font-size: 0.9rem; font-weight: 600;
+    color: #fff; background: var(--accent);
+    border: 0; border-radius: 8px; padding: 9px 16px; cursor: pointer;
+  }
+  button:hover { filter: brightness(1.06); }
+  button:disabled { opacity: 0.55; cursor: default; }
+  button.ghost {
+    color: var(--text); background: transparent;
+    border: 1px solid var(--border); font-weight: 500;
+  }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .status { font-size: 0.85rem; color: var(--muted); min-height: 1.2em; }
+  .status.err { color: var(--err-fg); }
+  .status.ok { color: var(--ok-fg); }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eef1f5; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace; font-size: 0.85em; }
+  td .note { display: block; color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .dot.ok { background: var(--ok-fg); }
+  .dot.warn { background: var(--warn-fg); }
+  .dot.off { background: #b8c0ca; }
+  .raw {
+    margin-top: 10px;
+    background: #f6f8fb;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: ui-monospace, "Cascadia Code", Consolas, "SF Mono", Menlo, monospace;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+  .raw .lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }
+  pre {
+    background: #10151d; color: #d8e0ea;
+    border-radius: 10px; padding: 14px 16px;
+    font-size: 0.78rem; overflow-x: auto;
+    margin: 10px 0 0;
+  }
+  .note { color: var(--muted); font-size: 0.8rem; margin-top: 10px; }
+  .hl { background: #fdf3e3; border: 1px solid #f0d9b0; border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; margin-top: 12px; }
+  .ok-box { background: #e6f6ec; border: 1px solid #bfe3cc; border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; margin-top: 12px; }
+  .err-box { background: #fdeaea; border: 1px solid #f3c6c6; border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; margin-top: 12px; }
+  .hidden { display: none; }
+  footer { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 8px; }
+  @media (max-width: 620px) {
+    th:nth-child(1), td:nth-child(1) { width: 46%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>AdGuard Extra Injection Check</h1>
+    <p>Checks whether the <b>AdGuard Extra</b> userscript is injected into this page and whether it is active on this domain.</p>
+  </header>
+
+  <section class="card">
+    <h2>Injection check</h2>
+    <p class="sub">AdGuard Extra has no public API or global. It is detected by the declarations its userscript leaves in the page world, plus TinyShield behaviour where available.</p>
+    <div class="row">
+      <button id="check-btn">Run check</button>
+      <span id="check-status" class="status">Checking…</span>
+    </div>
+
+    <div id="verdict-box" class="verdict" style="margin-top:14px">
+      <span id="verdict-badge" class="badge off">Checking…</span>
+      <div>
+        <div id="verdict-title" class="title">—</div>
+        <div id="verdict-hint" class="hint">—</div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Signal</th><th>Result</th><th>Strength</th></tr>
+      </thead>
+      <tbody id="signals"></tbody>
+    </table>
+
+    <details>
+      <summary>Found globals</summary>
+      <div id="globals" class="raw"><span class="lbl">No scan yet</span></div>
+    </details>
+
+    <div id="activity-note" class="hl hidden"></div>
+  </section>
+
+  <section class="card">
+    <h2>Self-test</h2>
+    <p class="sub">Verifies the detector itself without AdGuard Extra installed: loads the official AdGuard Extra userscript into a hidden, isolated frame and runs the same checks there. The current page is not modified.</p>
+    <div class="row">
+      <button id="selftest-btn" class="ghost">Run self-test</button>
+      <span id="selftest-status" class="status"></span>
+    </div>
+    <div id="selftest-result" class="hidden"></div>
+  </section>
+
+  <section class="card">
+    <h2>How it works</h2>
+    <table>
+      <thead><tr><th>Check</th><th>What it looks for</th><th>Strength</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>Extra core globals</code></td>
+          <td>Top-level declarations from the AdGuard Extra userscript: <code>shouldRunExtra</code>, <code>takeDomainsBlob</code>, <code>isTinyShieldAllowedForCurrentPage</code> and others.</td>
+          <td>Strong</td>
+        </tr>
+        <tr>
+          <td><code>TinyShield globals</code></td>
+          <td>Internal TinyShield functions bundled into AdGuard Extra: <code>EnableTinyShield</code>, <code>CreateTinyShieldController</code>, <code>Install*Patch</code>.</td>
+          <td>Strong (a group)</td>
+        </tr>
+        <tr>
+          <td><code>pageCallback$*</code>, <code>_0x*</code></td>
+          <td>Many top-level helpers specific to the obfuscated AdGuard Extra bundle.</td>
+          <td>Indirect</td>
+        </tr>
+        <tr>
+          <td><code>Inline script</code></td>
+          <td>An inline <code>&lt;script&gt;</code> whose text contains AdGuard Extra markers.</td>
+          <td>Strong, if present</td>
+        </tr>
+        <tr>
+          <td><code>Function.prototype.toString</code></td>
+          <td>TinyShield fakes native code for functions named <code>toString</code>, <code>get</code> or <code>set</code>.</td>
+          <td>Active check</td>
+        </tr>
+        <tr>
+          <td><code>Map.get</code>, <code>Map.set</code></td>
+          <td>TinyShield proxies these methods and stringifies arguments; a native Map never calls <code>toString</code> on a key or value.</td>
+          <td>Active check</td>
+        </tr>
+        <tr>
+          <td><code>setTimeout</code></td>
+          <td>Proxy trap frame in the stack when the timer stringifies its argument.</td>
+          <td>Active check</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="hl">
+      <b>Why globals?</b> AdGuard apps inject userscripts into the page world as a script. Its top-level
+      function declarations become properties of <code>window</code>. AdGuard Extra itself acts only on
+      domains from its own list, so on other sites it is inert — the leaked declarations are the only trace
+      it leaves. On this build that is <code>@version 1.1.41</code>.
+    </div>
+
+    <p class="note">
+      If a userscript manager wraps the code in a sandbox (for example, some Tampermonkey modes), the globals
+      will not appear. In that case the page reports “Not detected” or “Inconclusive”, and only the active
+      TinyShield checks can reveal anything. Test with AdGuard Extra enabled and disabled to see both states.
+    </p>
+
+    <details>
+      <summary>Expected results</summary>
+      <table>
+        <thead><tr><th>Setup</th><th>Expected verdict</th></tr></thead>
+        <tbody>
+          <tr><td>AdGuard app / extension with Extra enabled</td><td>AdGuard Extra injected</td></tr>
+          <tr><td>AdGuard app / extension with Extra disabled</td><td>Not detected</td></tr>
+          <tr><td>Plain browser, no Extra</td><td>Not detected</td></tr>
+          <tr><td>Self-test button</td><td>TinyShield + Extra markers found in the test frame</td></tr>
+        </tbody>
+      </table>
+    </details>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <button id="copy-btn" class="ghost">Copy report as JSON</button>
+      <span id="copy-status" class="status"></span>
+    </div>
+  </section>
+
+  <footer>Runs entirely in your browser. The self-test only loads the official AdGuard Extra userscript into a hidden frame.</footer>
+</div>
+
+<script id="extra-check-script" data-extra-detector="1">
+(function () {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const US_URL = 'https://userscripts.adtidy.org/release/adguard-extra/1.0/adguard-extra.user.js';
+
+  // Names observed in the top-level scope of adguard-extra.user.js 1.1.41.
+  const EXTRA_CORE = [
+    'shouldRunExtra',
+    'takeDomainsBlob',
+    'getTinyShieldDomains',
+    'isTinyShieldAllowedForCurrentPage',
+    'enableTinyShieldForCurrentPage'
+  ];
+
+  const TINY_SHIELD = [
+    'EnableTinyShield',
+    'CreateTinyShieldController',
+    'GetTinyShieldState',
+    'CreatePatchState',
+    'NormalizePatchIds',
+    'ResolveBrowserWindow',
+    'InstallFunctionToStringPatch',
+    'InstallMapGetPatch',
+    'InstallMapSetPatch',
+    'InstallWeakMapSetPatch',
+    'InstallSetTimeoutPatch',
+    'InstallSetIntervalPatch',
+    'ApplyMapGet',
+    'ApplyMapSet',
+    'ApplyWeakMapGet',
+    'ApplyWeakMapSet',
+    'CheckDepthInASWeakMapBudgeted',
+    'CountCommonKnownKeys',
+    'CountOccurrences',
+    'HasOwnEnumerableStringKey',
+    'IsASReinsertedAdvInvenArgsTypeMatched',
+    'IsASTimerMatched',
+    'IsIntegerLikeString',
+    'IsLikelyUselessMaskedPart',
+    'IsPatchEnabled',
+    'SafeArrayToString',
+    'ShouldSkipRegExpTest'
+  ];
+
+  const SECONDARY = [
+    'getTracker',
+    'onDOMContentLoaded',
+    'observeDomChanges',
+    'observeAllDomChanges',
+    'observeShadowRoots',
+    'removeScripts',
+    'removeNode',
+    'safeGetStylesheetRules',
+    'isBrowserSupported'
+  ];
+
+  const INLINE_TOKENS = [
+    'shouldRunExtra',
+    'takeDomainsBlob',
+    'EnableTinyShield',
+    'InstallFunctionToStringPatch',
+    'adguard-extra.user.js',
+    '@name AdGuard Extra'
+  ];
+
+  // Names that look like a public marker but are intentionally absent in AdGuard Extra.
+  const LEGACY = ['AdGuardExtra', 'adguardExtra', '__adguardExtra', 'tinyShield', '__tinyShield'];
+
+  let report = null;
+
+  function typeOf(win, name) {
+    try {
+      if (!(name in win)) return null;
+      const value = win[name];
+      return typeof value;
+    } catch (e) {
+      return 'unreadable';
+    }
+  }
+
+  function collect(win, doc) {
+    const out = {
+      href: (() => { try { return win.location.href; } catch (e) { return String(doc && doc.URL || ''); } })(),
+      names: [],
+      extraCore: [],
+      tinyShield: [],
+      secondary: [],
+      legacy: [],
+      pageCallbacks: 0,
+      obfuscated: 0,
+      inline: [],
+      inlineScripts: 0,
+      toStringPatched: false,
+      toStringDetails: '',
+      mapGetInstrumented: false,
+      mapSetInstrumented: false,
+      timeoutProxied: false,
+      timeoutStack: ''
+    };
+
+    try {
+      out.names = Object.getOwnPropertyNames(win);
+    } catch (e) {
+      out.names = [];
+    }
+
+    const names = new Set(out.names);
+    const has = (name) => names.has(name) || typeOf(win, name) !== null;
+
+    out.extraCore = EXTRA_CORE.filter(has);
+    out.tinyShield = TINY_SHIELD.filter(has);
+    out.secondary = SECONDARY.filter(has);
+    out.legacy = LEGACY.filter(has);
+
+    out.pageCallbacks = out.names.filter((n) => /^pageCallback(\$[0-9A-Za-z]+)?$/.test(n)).length;
+    out.obfuscated = out.names.filter((n) => /^_0x[0-9a-f]+$/i.test(n)).length;
+
+    // Inline script tags carrying Extra code. Skip this page's own detector script.
+    try {
+      const scripts = [...(doc ? doc.scripts : [])];
+      out.inlineScripts = scripts.length;
+      for (const script of scripts) {
+        if (script.dataset && script.dataset.extraDetector === '1') continue;
+        const src = script.src || '';
+        if (/adguard-extra\.user\.js|userscripts\.adtidy\.org/.test(src)) {
+          out.inline.push({ source: 'src', token: src });
+          continue;
+        }
+        if (src) continue;
+        const text = script.textContent || '';
+        for (const token of INLINE_TOKENS) {
+          if (text.includes(token)) {
+            out.inline.push({ source: 'inline', token });
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      /* ignore */
+    }
+
+    // 1) TinyShield fakes native code for user functions named toString / get / set.
+    try {
+      const toString = win.Function.prototype.toString;
+      const fn = function toString() { return 'AG_EXTRA_PROBE_FN'; };
+      const getter = ({ get() { return 'AG_EXTRA_PROBE_GET'; } }).get;
+      const fnSource = toString.call(fn);
+      const getSource = toString.call(getter);
+      out.toStringPatched =
+        (/\[native code\]/.test(fnSource) && !fnSource.includes('AG_EXTRA_PROBE_FN')) ||
+        (/\[native code\]/.test(getSource) && !getSource.includes('AG_EXTRA_PROBE_GET'));
+      out.toStringDetails = 'function toString: ' + String(fnSource).slice(0, 120) +
+        ' | getter: ' + String(getSource).slice(0, 120);
+    } catch (e) {
+      out.toStringDetails = 'probe failed: ' + String(e);
+    }
+
+    // 2) TinyShield proxies Map.prototype.get and stringifies its arguments.
+    //    A native Map never calls toString on a key, so any hit proves instrumentation.
+    try {
+      const key = function agExtraMapKey() {};
+      key.toString = function () { out.mapGetInstrumented = true; return 'probe'; };
+      new win.Map().get(key);
+    } catch (e) {
+      /* ignore */
+    }
+
+    // 3) Same for Map.prototype.set, where a function value gets stringified.
+    try {
+      const value = function agExtraMapValue() {};
+      value.toString = function () { out.mapSetInstrumented = true; return 'probe'; };
+      new win.Map().set('ag-extra-probe', value);
+    } catch (e) {
+      /* ignore */
+    }
+
+    // 4) setTimeout is a Proxy; a coercion inside the apply trap leaves an "apply" frame.
+    try {
+      const bait = {
+        toString() {
+          out.timeoutStack = String(new Error().stack || '');
+          throw new Error('AG_EXTRA_PROBE_STOP');
+        }
+      };
+      try { win.setTimeout(bait, 0); } catch (e) { /* expected */ }
+      out.timeoutProxied = /Object\.apply|(^|\s|\n)apply@|at apply /.test(out.timeoutStack);
+    } catch (e) {
+      out.timeoutStack = 'probe failed: ' + String(e);
+    }
+
+    return out;
+  }
+
+  function classify(data) {
+    const strong =
+      data.extraCore.length > 0 ||
+      data.tinyShield.length >= 3 ||
+      data.inline.some((hit) => hit.source === 'src' || hit.token === 'shouldRunExtra' ||
+        hit.token === 'takeDomainsBlob' || hit.token === '@name AdGuard Extra');
+    const possible =
+      data.tinyShield.length > 0 ||
+      data.secondary.length >= 3 ||
+      data.pageCallbacks >= 10 ||
+      data.obfuscated >= 25 ||
+      data.inline.length > 0;
+
+    const active =
+      data.toStringPatched ||
+      data.mapGetInstrumented ||
+      data.mapSetInstrumented ||
+      data.timeoutProxied;
+
+    if (strong) return { level: 'injected', active: active, label: 'AdGuard Extra injected', tone: 'ok' };
+    if (possible) return { level: 'possible', active: active, label: 'Possible injection — weak signals only', tone: 'warn' };
+    if (active) return { level: 'active-only', active: true, label: 'TinyShield-style instrumentation detected', tone: 'warn' };
+    return { level: 'none', active: false, label: 'Not detected', tone: 'off' };
+  }
+
+  function badge(el, tone, text) {
+    el.className = 'badge ' + tone;
+    el.textContent = text;
+  }
+
+  function row(name, note, value, state, strength) {
+    const tr = document.createElement('tr');
+    const cellName = document.createElement('td');
+    cellName.innerHTML = '<code>' + name + '</code><span class="note">' + note + '</span>';
+    const cellValue = document.createElement('td');
+    cellValue.innerHTML = '<span class="dot ' + state + '"></span>' + value;
+    const cellStrength = document.createElement('td');
+    cellStrength.textContent = strength;
+    tr.append(cellName, cellValue, cellStrength);
+    return tr;
+  }
+
+  function render(data) {
+    const verdict = classify(data);
+    const badgeEl = $('verdict-badge');
+    badge(badgeEl, verdict.tone, verdict.label);
+    $('verdict-title').textContent =
+      verdict.level === 'injected' ? 'AdGuard Extra is injected into this page' :
+      verdict.level === 'possible' ? 'Only indirect traces were found' :
+      verdict.level === 'active-only' ? 'Instrumentation is active, injection markers are missing' :
+      'No AdGuard Extra traces';
+    $('verdict-hint').textContent =
+      verdict.level === 'injected'
+        ? (verdict.active
+            ? 'TinyShield patches are active on ' + location.hostname + '.'
+            : 'Injected, but not active on ' + location.hostname + ' (Extra has no rules for this domain).')
+        : verdict.level === 'possible'
+          ? 'Found names that look like the obfuscated AdGuard Extra bundle. Confirm with the self-test or with Extra enabled.'
+          : verdict.level === 'active-only'
+            ? 'Map/setTimeout/toString are instrumented, but the expected globals are absent. Extra may be injected in a wrapped scope.'
+            : 'Open the page with AdGuard Extra enabled, or run the self-test below to verify the detector.';
+
+    const tbody = $('signals');
+    tbody.innerHTML = '';
+    const coreState = data.extraCore.length ? 'ok' : 'off';
+    tbody.append(
+      row('Extra core globals',
+        'shouldRunExtra, takeDomainsBlob, isTinyShieldAllowedForCurrentPage',
+        data.extraCore.length ? data.extraCore.length + ' found' : 'none',
+        coreState, 'Strong'),
+      row('TinyShield globals',
+        'EnableTinyShield, CreateTinyShieldController, Install*Patch',
+        data.tinyShield.length ? data.tinyShield.length + ' of ' + TINY_SHIELD.length : 'none',
+        data.tinyShield.length >= 3 ? 'ok' : data.tinyShield.length ? 'warn' : 'off', 'Strong (group)'),
+      row('pageCallback$* helpers',
+        'Top-level declarations from the Extra bundle',
+        String(data.pageCallbacks),
+        data.pageCallbacks >= 10 ? 'ok' : data.pageCallbacks ? 'warn' : 'off', 'Indirect'),
+      row('_0x* globals',
+        'Obfuscated top-level helpers',
+        String(data.obfuscated),
+        data.obfuscated >= 25 ? 'ok' : data.obfuscated ? 'warn' : 'off', 'Indirect'),
+      row('Inline script tags',
+        'Script text or src containing AdGuard Extra markers',
+        data.inline.length ? data.inline.map((h) => h.token).join(', ') : 'none',
+        data.inline.length ? 'ok' : 'off', 'Strong'),
+      row('Function.prototype.toString',
+        'TinyShield fakes native code for toString/get/set',
+        data.toStringPatched ? 'patched' : 'native',
+        data.toStringPatched ? 'warn' : 'off', 'Active'),
+      row('Map.prototype.get',
+        'Key is stringified — a native Map never does this',
+        data.mapGetInstrumented ? 'instrumented' : 'native',
+        data.mapGetInstrumented ? 'warn' : 'off', 'Active'),
+      row('Map.prototype.set',
+        'Value is stringified — a native Map never does this',
+        data.mapSetInstrumented ? 'instrumented' : 'native',
+        data.mapSetInstrumented ? 'warn' : 'off', 'Active'),
+      row('setTimeout',
+        'Proxy apply trap visible in the stack',
+        data.timeoutProxied ? 'proxied' : 'native',
+        data.timeoutProxied ? 'warn' : 'off', 'Active'),
+      row('Public global',
+        'AdGuardExtra / __adguardExtra — no such API in Extra',
+        data.legacy.length ? data.legacy.join(', ') : 'absent (expected)',
+        data.legacy.length ? 'warn' : 'off', 'Reference')
+    );
+
+    const groups = [
+      ['Extra core', data.extraCore],
+      ['TinyShield', data.tinyShield],
+      ['Secondary', data.secondary],
+      ['Legacy names', data.legacy]
+    ];
+    $('globals').innerHTML = groups.map(([label, list]) =>
+      '<div><span class="lbl">' + label + ' (' + list.length + ')</span><br>' +
+      (list.length ? list.map((n) => '<code>' + n + '</code>').join(', ') : '—') + '</div>'
+    ).join('<div style="height:8px"></div>');
+
+    const note = $('activity-note');
+    const activeBits = [];
+    if (data.toStringPatched) activeBits.push('<code>Function.prototype.toString</code>');
+    if (data.mapGetInstrumented) activeBits.push('<code>Map.prototype.get</code>');
+    if (data.mapSetInstrumented) activeBits.push('<code>Map.prototype.set</code>');
+    if (data.timeoutProxied) activeBits.push('<code>setTimeout</code>');
+    if (activeBits.length) {
+      note.classList.remove('hidden');
+      note.innerHTML = '<b>Active instrumentation:</b> ' + activeBits.join(', ') +
+        '. TinyShield patches are enabled on this domain, so Extra is not only injected but running its rules.';
+    } else {
+      note.classList.add('hidden');
+      note.innerHTML = '';
+    }
+
+    $('check-status').textContent = verdict.level === 'injected'
+      ? 'Injection markers found.'
+      : verdict.level === 'possible'
+        ? 'Weak traces only — see the self-test.'
+        : 'No injection markers found.';
+    $('check-status').className = 'status' + (verdict.level === 'injected' ? ' ok' : '');
+  }
+
+  function run() {
+    const data = collect(window, document);
+    const verdict = classify(data);
+    report = {
+      detectedAt: new Date().toISOString(),
+      url: location.href,
+      userAgent: navigator.userAgent,
+      verdict: verdict.label,
+      level: verdict.level,
+      active: verdict.active,
+      markers: {
+        extraCore: data.extraCore,
+        tinyShield: data.tinyShield,
+        secondary: data.secondary,
+        legacy: data.legacy,
+        pageCallbackCount: data.pageCallbacks,
+        obfuscatedCount: data.obfuscated,
+        inlineScriptHits: data.inline
+      },
+      activity: {
+        functionToStringPatched: data.toStringPatched,
+        mapGetInstrumented: data.mapGetInstrumented,
+        mapSetInstrumented: data.mapSetInstrumented,
+        setTimeoutProxied: data.timeoutProxied
+      },
+      selfTest: report && report.selfTest ? report.selfTest : null
+    };
+    render(data);
+  }
+
+  // --- Self-test: official userscript in a hidden same-origin frame ---
+  async function selfTest() {
+    const btn = $('selftest-btn');
+    const status = $('selftest-status');
+    const box = $('selftest-result');
+    btn.disabled = true;
+    status.textContent = 'Loading…';
+    status.className = 'status';
+    box.className = 'hidden';
+    box.innerHTML = '';
+
+    let frame = null;
+    try {
+      frame = document.createElement('iframe');
+      frame.setAttribute('aria-hidden', 'true');
+      frame.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden';
+      document.body.appendChild(frame);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const idoc = frame.contentDocument;
+      if (!idoc) throw new Error('cannot access the test frame');
+
+      const loaded = await new Promise((resolve) => {
+        const script = idoc.createElement('script');
+        const timer = setTimeout(() => resolve({ ok: false, error: 'timeout loading the userscript' }), 20000);
+        script.onload = () => { clearTimeout(timer); resolve({ ok: true }); };
+        script.onerror = () => { clearTimeout(timer); resolve({ ok: false, error: 'the userscript could not be loaded (network or CSP)' }); };
+        script.src = US_URL + (US_URL.includes('?') ? '&' : '?') + 'self-test=' + Date.now();
+        idoc.head.appendChild(script);
+      });
+      if (!loaded.ok) throw new Error(loaded.error);
+
+      const data = collect(frame.contentWindow, idoc);
+      const verdict = classify(data);
+      const passed = data.extraCore.length > 0 && data.tinyShield.length >= 3;
+
+      box.className = passed ? 'ok-box' : 'err-box';
+      box.innerHTML =
+        '<b>' + (passed ? 'Self-test passed.' : 'Self-test failed.') + '</b> ' +
+        'In a clean frame the official userscript produced ' +
+        data.extraCore.length + ' Extra core marker(s), ' +
+        data.tinyShield.length + ' TinyShield marker(s), ' +
+        data.pageCallbacks + ' pageCallback$* helper(s) and ' +
+        data.obfuscated + ' _0x* global(s). ' +
+        'Verdict in the frame: <b>' + verdict.label + '</b>.';
+      status.textContent = passed ? 'Passed ✓' : 'Failed';
+      status.className = 'status ' + (passed ? 'ok' : 'err');
+
+      report = report || {};
+      report.selfTest = {
+        at: new Date().toISOString(),
+        userscript: US_URL,
+        passed: passed,
+        extraCore: data.extraCore,
+        tinyShieldCount: data.tinyShield.length,
+        pageCallbackCount: data.pageCallbacks,
+        obfuscatedCount: data.obfuscated
+      };
+    } catch (e) {
+      box.className = 'err-box';
+      box.innerHTML = '<b>Self-test failed.</b> ' + String(e && e.message || e) +
+        '. Load the page over HTTPS, or open the userscript URL once in a tab and retry.';
+      status.textContent = 'Failed';
+      status.className = 'status err';
+      report = report || {};
+      report.selfTest = { at: new Date().toISOString(), passed: false, error: String(e) };
+    } finally {
+      if (frame && frame.parentNode) frame.parentNode.removeChild(frame);
+      btn.disabled = false;
+    }
+  }
+
+  $('check-btn').addEventListener('click', run);
+  $('selftest-btn').addEventListener('click', selfTest);
+
+  $('copy-btn').addEventListener('click', async () => {
+    const status = $('copy-status');
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(report || {}, null, 2));
+      status.textContent = 'Copied ✓';
+      status.className = 'status ok';
+    } catch (e) {
+      status.textContent = 'Clipboard blocked — select and copy from the console.';
+      status.className = 'status err';
+    }
+    setTimeout(() => { status.textContent = ''; status.className = 'status'; }, 2500);
+  });
+
+  run(); // auto-run on load
+  // AdGuard may inject the userscript slightly after the page script; re-check once.
+  setTimeout(run, 1500);
+})();
+</script>
+</body>
+</html>
