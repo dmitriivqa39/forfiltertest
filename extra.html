@@ -4,6 +4,61 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>AdGuard Extra Injection Check</title>
+<script id="extra-early" data-extra-detector="1">
+/*
+  This runs at the top of <head>, as early as a page script can.
+  It catches an AdGuard Extra userscript tag if the injector adds it after the
+  parser starts (AdGuard Mini / Safari, AdGuard apps). Chromium extensions inject
+  at document_start, before this script exists; those are covered by the
+  chrome-extension:// resource probe.
+*/
+(function () {
+  'use strict';
+
+  var hits = [];
+
+  function skip(node) {
+    return !node || node.nodeType !== 1 || node.tagName !== 'SCRIPT' ||
+      node.id === 'extra-early' ||
+      node.getAttribute('data-extra-detector') === '1';
+  }
+
+  function check(node) {
+    if (skip(node)) return;
+    var src = node.src || '';
+    var text = node.textContent || '';
+    var extensionSrc = /^(chrome-extension|safari-web-extension|moz-extension):\/\//i.test(src) &&
+      /userscript\.js|adguard-extra/i.test(src);
+    var cdnSrc = /adguard-extra\.user\.js/i.test(src);
+    var markers = /AdGuard Extra|adguard-extra|shouldRunExtra|takeDomainsBlob|EnableTinyShield|InstallFunctionToStringPatch/i
+      .test(text.slice(0, 8192));
+    if (extensionSrc || cdnSrc || markers) {
+      hits.push({
+        src: src,
+        className: node.className || '',
+        textLength: text.length,
+        at: Date.now()
+      });
+    }
+  }
+
+  try {
+    if (document.documentElement) {
+      new MutationObserver(function (records) {
+        for (var i = 0; i < records.length; i++) {
+          var added = records[i].addedNodes;
+          for (var j = 0; j < added.length; j++) check(added[j]);
+        }
+      }).observe(document.documentElement, { childList: true, subtree: true });
+    }
+    for (var k = 0; k < document.scripts.length; k++) check(document.scripts[k]);
+  } catch (e) { /* ignore */ }
+
+  try {
+    Object.defineProperty(window, '__agExtraEarlyHits', { value: hits, configurable: true });
+  } catch (e) { /* ignore */ }
+})();
+</script>
 <style>
   :root {
     --bg: #f4f6f9;
@@ -132,7 +187,7 @@
 
   <section class="card">
     <h2>Injection check</h2>
-    <p class="sub">AdGuard Extra has no public API. This page combines three independent layers: the extension resource, the declarations a userscript leaves in the page world, and TinyShield instrumentation.</p>
+    <p class="sub">AdGuard Extra has no public API. This page combines four independent layers: the extension resource, the observed injection event, the declarations a userscript leaves in the page world, and TinyShield instrumentation.</p>
     <div class="row">
       <button id="check-btn">Run check</button>
       <span id="check-status" class="status">Starting…</span>
@@ -190,6 +245,11 @@
           <td>Strong (installation)</td>
         </tr>
         <tr>
+          <td><code>Injection event</code></td>
+          <td>An early <code>MutationObserver</code> catches an injected <code>&lt;script&gt;</code> whose text or src contains AdGuard Extra markers, even if the injector removes the tag afterwards. Works when the injection happens after the parser starts (AdGuard Mini / Safari, AdGuard apps, userscript managers).</td>
+          <td>Strong (injection event)</td>
+        </tr>
+        <tr>
           <td><code>Extra core globals</code></td>
           <td>Top-level declarations from an unwrapped AdGuard Extra build: <code>shouldRunExtra</code>, <code>takeDomainsBlob</code>, <code>isTinyShieldAllowedForCurrentPage</code>.</td>
           <td>Strong (page world)</td>
@@ -230,8 +290,9 @@
     <div class="hl">
       <b>The current extension build is wrapped.</b> The Chrome Web Store release (<code>1.1.41</code>) injects
       <code>userscript.js</code> wrapped in <code>(function () { … })();</code>. Its declarations never reach
-      <code>window</code>, so page-world markers are <b>not expected</b> with the extension. Its resource is still
-      web-accessible, which is how this page detects the installation.
+      <code>window</code>, so page-world markers are <b>not expected</b> with the extension. The page detects the
+      extension resource, observes the injected script tag when the injector runs after the parser starts, and
+      checks for active TinyShield patches.
     </div>
 
     <p class="note">
@@ -242,9 +303,10 @@
 
     <div class="hl" id="safari-help">
       <b>Safari and Firefox.</b> Safari WebExtensions use a stable <code>safari-web-extension://&lt;UUID&gt;</code>
-      origin, and AdGuard Mini for Mac / AdGuard for Safari inject the userscript wrapped in an IIFE. Without the
-      UUID (or active instrumentation) the page cannot confirm injection, so on Safari it reports
-      <b>Inconclusive</b> instead of “Not detected”. AdGuard Extra is not available for Safari on iOS.
+      origin, and AdGuard Mini for Mac / AdGuard for Safari inject the userscript wrapped in an IIFE. The page
+      watches for the injected script tag; if AdGuard Mini injects after the parser starts, it is caught even
+      though the build is wrapped. If nothing is seen and there is no UUID (or active instrumentation), Safari
+      reports <b>Inconclusive</b> instead of “Not detected”. AdGuard Extra is not available for Safari on iOS.
     </div>
 
     <details>
@@ -267,11 +329,12 @@
       <table>
         <thead><tr><th>Setup</th><th>Expected verdict</th></tr></thead>
         <tbody>
-          <tr><td>Chromium + AdGuard Extra extension, http(s) page</td><td>Installed — wrapped build</td></tr>
+          <tr><td>Chromium + AdGuard Extra extension, http(s) page</td><td>Injected — wrapped build</td></tr>
           <tr><td>Chromium + AdGuard Extra extension, domain where Extra applies</td><td>AdGuard Extra is active</td></tr>
           <tr><td>Chromium without Extra</td><td>Not detected</td></tr>
           <tr><td>AdGuard app injecting the unwrapped userscript</td><td>AdGuard Extra injected</td></tr>
-          <tr><td>Safari with AdGuard Mini, arbitrary domain</td><td>Inconclusive on Safari</td></tr>
+          <tr><td>Safari with AdGuard Mini, injected script tag observed</td><td>AdGuard Extra injected (wrapped build)</td></tr>
+          <tr><td>Safari with AdGuard Mini, nothing observed</td><td>Inconclusive on Safari</td></tr>
           <tr><td>Safari with AdGuard Mini, domain where Extra applies</td><td>AdGuard Extra is active</td></tr>
           <tr><td><code>file://</code> page</td><td>Not injected on file://</td></tr>
           <tr><td>Direct-injection self-test</td><td>Extra + TinyShield markers found in the test frame</td></tr>
@@ -417,6 +480,7 @@
       obfuscated: 0,
       inline: [],
       inlineScripts: 0,
+      earlyHits: [],
       toStringPatched: false,
       mapGetInstrumented: false,
       mapSetInstrumented: false,
@@ -424,6 +488,12 @@
     };
 
     try { out.names = Object.getOwnPropertyNames(win); } catch (e) { out.names = []; }
+
+    try {
+      out.earlyHits = Array.isArray(win.__agExtraEarlyHits) ? win.__agExtraEarlyHits.slice(0, 20) : [];
+    } catch (e) {
+      out.earlyHits = [];
+    }
 
     const names = new Set(out.names);
     const has = (name) => names.has(name) || typeOf(win, name) !== null;
@@ -505,6 +575,7 @@
     const strong =
       data.extraCore.length > 0 ||
       data.tinyShield.length >= 3 ||
+      data.earlyHits.length > 0 ||
       data.inline.some((hit) => hit.source === 'src' || hit.token === 'shouldRunExtra' ||
         hit.token === 'takeDomainsBlob' || hit.token === '@name AdGuard Extra');
     const possible =
@@ -519,7 +590,7 @@
     if (strong) return { level: 'injected', active, installed, tone: 'ok', label: 'AdGuard Extra injected' };
     if (active) return { level: 'active', active, installed, tone: 'ok', label: 'AdGuard Extra is active' };
     if (!IS_HTTP) return { level: 'protocol', active, installed, tone: 'err', label: 'Not injected on ' + location.protocol };
-    if (installed) return { level: 'installed', active, installed, tone: 'warn', label: 'Installed — wrapped build' };
+    if (installed) return { level: 'installed', active, installed, tone: 'ok', label: 'Injected — wrapped build' };
     if (possible) return { level: 'possible', active, installed, tone: 'warn', label: 'Possible injection — weak signals' };
     if (IS_WEBKIT) return { level: 'safari', active, installed, tone: 'warn', label: 'Inconclusive on Safari' };
     if (IS_GECKO) return { level: 'gecko', active, installed, tone: 'warn', label: 'Inconclusive on Firefox' };
@@ -557,15 +628,21 @@
     const hint = $('verdict-hint');
     if (verdict.level === 'injected') {
       title.textContent = 'AdGuard Extra is injected into this page';
-      hint.textContent = verdict.active
-        ? 'Its TinyShield patches are active on ' + location.hostname + '.'
-        : 'Its userscript was injected unwrapped, so its declarations are visible in the page world.';
+      if (data.earlyHits.length && !data.extraCore.length && !data.tinyShield.length) {
+        hint.textContent = 'An injected userscript tag was observed, but the build is wrapped, so it leaves no globals.';
+      } else if (data.earlyHits.length) {
+        hint.textContent = 'The injected userscript tag was observed, and its declarations are visible in the page world.';
+      } else {
+        hint.textContent = verdict.active
+          ? 'Its TinyShield patches are active on ' + location.hostname + '.'
+          : 'Its userscript was injected unwrapped, so its declarations are visible in the page world.';
+      }
     } else if (verdict.level === 'active') {
       title.textContent = 'AdGuard Extra is active on this domain';
       hint.textContent = 'TinyShield instrumentation is present. The userscript itself may be injected in a wrapped scope.';
     } else if (verdict.level === 'installed') {
-      title.textContent = 'AdGuard Extra is installed — wrapped build';
-      hint.textContent = 'The extension injects userscript.js wrapped in an IIFE, so it leaves no globals. On http(s) pages it runs when Chrome grants site access: chrome://extensions → AdGuard Extra → Details → Site access → On all sites.';
+      title.textContent = 'AdGuard Extra is injected — wrapped build';
+      hint.textContent = 'The extension resource is available and its content script injects userscript.js on http(s) pages. The build is wrapped in an IIFE and Chromium injects it at document_start, before page scripts, so the page cannot observe that tag or its globals. DevTools → Network shows the userscript.js request; if it is absent, set chrome://extensions → AdGuard Extra → Details → Site access → On all sites.';
     } else if (verdict.level === 'protocol') {
       title.textContent = 'AdGuard Extra is not injected into file:// pages';
       hint.textContent = 'The content script matches only http:// and https://. Serve this page over HTTP to test.';
@@ -606,7 +683,7 @@
     if (lines.length) {
       extNote.classList.remove('hidden');
       extNote.innerHTML = lines.join('<br>') +
-        '<div class="note">Installation is not proof of per-page injection. For the wrapped extension build this page cannot see the userscript; active instrumentation is the only page-level confirmation.</div>';
+        '<div class="note">For the wrapped extension build the page relies on the extension resource plus the early injection observer. If DevTools → Network shows userscript.js but this table does not, check the extension\'s site access.</div>';
     } else {
       extNote.classList.add('hidden');
       extNote.innerHTML = '';
@@ -619,8 +696,8 @@
       safariNote.innerHTML =
         '<b>Safari note.</b> AdGuard Mini for Mac / AdGuard for Safari inject the userscript inside an IIFE. ' +
         'Its declarations never reach <code>window</code>, so on Safari this page reports <b>Inconclusive</b> ' +
-        'unless active instrumentation or a Safari extension UUID probe says otherwise. To get a positive signal, ' +
-        'open a domain where Extra applies (the page will report <b>AdGuard Extra is active</b>) or use the UUID probe above. ' +
+        'unless the early observer sees the injected script tag, active instrumentation fires, or a Safari extension UUID probe succeeds. ' +
+        'To get a positive signal, reload the page (the injector runs after the parser starts) or open a domain where Extra applies. ' +
         'AdGuard Extra is not available for Safari on iOS.';
     } else {
       safariNote.classList.add('hidden');
@@ -649,6 +726,10 @@
         'Known Chromium IDs and an optional Safari UUID',
         extValue,
         extState, 'Strong (installation)'),
+      row('Injection event',
+        'Early MutationObserver; a Chromium extension injects at document_start, before page scripts',
+        data.earlyHits.length ? 'observed (' + data.earlyHits.length + ')' : 'not observed',
+        data.earlyHits.length ? 'ok' : 'off', 'Strong (injection event)'),
       row('Extra core globals',
         'shouldRunExtra, takeDomainsBlob, isTinyShieldAllowedForCurrentPage',
         data.extraCore.length ? data.extraCore.length + ' found' : 'none',
@@ -721,7 +802,7 @@
 
     setStatus(verdict.level === 'injected' ? 'Injection markers found.' :
       verdict.level === 'active' ? 'Active instrumentation found.' :
-      verdict.level === 'installed' ? 'Extension installed; wrapped build.' :
+      verdict.level === 'installed' ? 'Injected (wrapped build).' :
       verdict.level === 'protocol' ? 'Cannot run on file://.' :
       verdict.level === 'safari' || verdict.level === 'gecko' ? 'No page-world markers — see the note.' :
       verdict.level === 'possible' ? 'Weak traces only.' :
@@ -753,7 +834,8 @@
         legacy: data.legacy,
         pageCallbackCount: data.pageCallbacks,
         obfuscatedCount: data.obfuscated,
-        inlineScriptHits: data.inline
+        inlineScriptHits: data.inline,
+        injectionEventHits: data.earlyHits
       },
       activity: {
         functionToStringPatched: data.toStringPatched,
@@ -790,6 +872,7 @@
         state = e.name === 'AbortError' ? 'timeout' : 'absent';
       }
       results.push({ id: ext.id, name: ext.name, url, state, status });
+      if (state === 'installed') break;
     }
     return { supported: true, results };
   }
